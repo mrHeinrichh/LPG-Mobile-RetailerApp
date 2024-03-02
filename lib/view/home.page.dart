@@ -54,7 +54,7 @@ class _HomePageState extends State<HomePage> {
   void searchItems() async {
     final searchTerm = searchController.text;
     final url = Uri.parse(
-        'https://lpg-api-06n8.onrender.com/api/v1/items/?search=$searchTerm');
+        'https://lpg-api-06n8.onrender.com/api/v1/items/search?search=$searchTerm');
     final response = await http.get(url);
     if (!mounted) {
       return;
@@ -70,13 +70,16 @@ class _HomePageState extends State<HomePage> {
         data.forEach((item) {
           final category = item['category'];
           final product = {
-            'id': item['_id'] ?? 'ID Not Available',
+            '_id': item['_id'] ?? 'ID Not Available',
             'name': item['name'] ?? 'Name Not Available',
             'price': (item['retailerPrice'] ?? 0).toString(),
+            'showPrice': NumberFormat.decimalPattern().format(
+                double.parse((item['retailerPrice'] ?? 0).toStringAsFixed(2))),
             'imageUrl': item['image'] ?? 'Image URL Not Available',
             'description': item['description'] ?? 'Description Not Available',
             'weight': (item['weight'] ?? 0).toString(),
             'stock': (item['stock'] ?? 0).toString(),
+            'availableStock': (item['stock'] ?? 0).toString(),
           };
 
           if (groupedData.containsKey(category)) {
