@@ -31,6 +31,49 @@ class _ProfilePageState extends State<ProfilePage> {
   final formKey = GlobalKey<FormState>();
   File? _image;
   final imageStreamController = StreamController<File?>.broadcast();
+  bool _mounted = true;
+
+  @override
+  void dispose() {
+    _mounted = false;
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    String? userId = Provider.of<UserProvider>(context, listen: false).userId;
+    if (_mounted) {
+      _userDetailsFuture = fetchUserDetails(userId!);
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchUserDetails(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://lpg-api-06n8.onrender.com/api/v1/users/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (_mounted) {
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> userDetails = jsonDecode(response.body);
+          print(response.body);
+          return userDetails;
+        } else {
+          throw Exception('Failed to load user details');
+        }
+      }
+    } catch (error) {
+      if (_mounted) {
+        print('Error fetching user details: $error');
+        throw Exception('Failed to load user details');
+      }
+    }
+    throw Exception('Failed to load user details');
+  }
 
   Future<void> _takeImage() async {
     final pickedFile =
@@ -173,29 +216,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<Map<String, dynamic>> fetchUserDetails(String userId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://lpg-api-06n8.onrender.com/api/v1/users/$userId'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> userDetails = jsonDecode(response.body);
-        print(response.body);
-        return userDetails;
-      } else {
-        throw Exception('Failed to load user details');
-      }
-    } catch (error) {
-      print('Error fetching user details: $error');
-      throw Exception('Failed to load user details');
-    }
-  }
-
-  // Di gumagana Change Password
   Future<void> changePassword(String userId, String newPassword) async {
     try {
       final response = await Dio().patch(
@@ -219,16 +239,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _handleRefresh() async {
     String? userId = Provider.of<UserProvider>(context, listen: false).userId;
-    setState(() {
-      _userDetailsFuture = fetchUserDetails(userId!);
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    String? userId = Provider.of<UserProvider>(context, listen: false).userId;
-    _userDetailsFuture = fetchUserDetails(userId!);
+    if (_mounted) {
+      setState(() {
+        _userDetailsFuture = fetchUserDetails(userId!);
+      });
+    }
   }
 
   bool isViewAppointmentVisible = true;
@@ -246,6 +261,64 @@ class _ProfilePageState extends State<ProfilePage> {
       isViewAppointmentVisible = true;
       isCardVisible = false;
     });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    String? userId = Provider.of<UserProvider>(context).userId;
+    if (userId != null) {
+      return FutureBuilder<Map<String, dynamic>>(
+        future: _userDetailsFuture,
+        builder: (context, snapshot) {
+          print('Connection State: ${snapshot.connectionState}');
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            print('Waiting for data...');
+            return Scaffold(
+              appBar: AppBar(
+                automaticallyImplyLeading: false,
+                backgroundColor: Colors.white,
+                elevation: 1,
+                title: Text(
+                  'Profile',
+                  style: TextStyle(
+                    color: const Color(0xFF050404).withOpacity(0.9),
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                centerTitle: true,
+                iconTheme: IconThemeData(
+                  color: const Color(0xFF050404).withOpacity(0.8),
+                ),
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(1),
+                  child: Container(
+                    color: Colors.black,
+                    height: 0.2,
+                  ),
+                ),
+              ),
+              body: Center(
+                child: LoadingAnimationWidget.flickr(
+                  leftDotColor: const Color(0xFF050404).withOpacity(0.8),
+                  rightDotColor: const Color(0xFFd41111).withOpacity(0.8),
+                  size: 40,
+                ),
+              ),
+            );
+          } else if (snapshot.hasError || snapshot.data == null) {
+            print('Error loading user details: ${snapshot.error}');
+            return const Text('Error loading user details');
+          } else {
+            Map<String, dynamic> userDetails = snapshot.data!;
+            print('User details loaded successfully: $userDetails');
+            return buildProfileWidget(userDetails, userId);
+          }
+        },
+      );
+    } else {
+      return const Text('User ID not available');
+    }
   }
 
   Widget buildProfileWidget(Map<String, dynamic> userDetails, String? userId) {
@@ -277,10 +350,8 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: () {
-          String? userId =
-              Provider.of<UserProvider>(context, listen: false).userId;
-          return fetchUserDetails(userId!);
+        onRefresh: () async {
+          await _handleRefresh();
         },
         color: const Color(0xFF050404),
         strokeWidth: 2.5,
@@ -293,7 +364,7 @@ class _ProfilePageState extends State<ProfilePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 30),
-                SizedBox(
+                Container(
                   height: 150,
                   child: Stack(
                     children: [
@@ -371,6 +442,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Card(
+                              color: Colors.white,
                               elevation: 5,
                               child: Padding(
                                 padding: const EdgeInsets.all(12.0),
@@ -417,6 +489,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                                   if (isCardVisible)
                                     Card(
+                                      color: Colors.white,
                                       elevation: 5,
                                       child: Padding(
                                         padding: const EdgeInsets.all(12.0),
@@ -481,6 +554,233 @@ class _ProfilePageState extends State<ProfilePage> {
                               child: Column(
                                 children: [
                                   const SizedBox(height: 5),
+                                  // ProfileButton(
+                                  //   onPressed: () {
+                                  //     showDialog(
+                                  //       context: context,
+                                  //       builder: (BuildContext context) {
+                                  //         nameController.text =
+                                  //             userData['name'] ?? '';
+                                  //         contactNumberController.text =
+                                  //             userData['contactNumber'] ?? '';
+                                  //         addressController.text =
+                                  //             userData['address'] ?? '';
+                                  //         emailController.text =
+                                  //             userData['email'] ?? '';
+                                  //         return AlertDialog(
+                                  //           backgroundColor: Colors.white,
+                                  //           title: const Center(
+                                  //             child: Text(
+                                  //               'Edit Personal Information',
+                                  //               textAlign: TextAlign.center,
+                                  //               style: TextStyle(
+                                  //                 fontSize: 18,
+                                  //                 fontWeight: FontWeight.bold,
+                                  //               ),
+                                  //             ),
+                                  //           ),
+                                  //           content: StatefulBuilder(
+                                  //             builder: (BuildContext context,
+                                  //                 StateSetter setState) {
+                                  //               return SingleChildScrollView(
+                                  //                 child: Form(
+                                  //                   key: formKey,
+                                  //                   child: Column(
+                                  //                     mainAxisSize:
+                                  //                         MainAxisSize.min,
+                                  //                     children: [
+                                  //                       const Divider(),
+                                  //                       StreamBuilder<File?>(
+                                  //                         stream:
+                                  //                             imageStreamController
+                                  //                                 .stream,
+                                  //                         builder: (context,
+                                  //                             snapshot) {
+                                  //                           return Column(
+                                  //                             children: [
+                                  //                               Stack(
+                                  //                                 alignment:
+                                  //                                     Alignment
+                                  //                                         .topRight,
+                                  //                                 children: [
+                                  //                                   Center(
+                                  //                                     child: snapshot.data !=
+                                  //                                             null
+                                  //                                         ? CircleAvatar(
+                                  //                                             radius: 50,
+                                  //                                             backgroundImage: FileImage(snapshot.data!),
+                                  //                                           )
+                                  //                                         : (userData['image'] != null && userData['image'].toString().isNotEmpty)
+                                  //                                             ? CircleAvatar(
+                                  //                                                 radius: 50,
+                                  //                                                 backgroundImage: NetworkImage(
+                                  //                                                   userData['image'].toString(),
+                                  //                                                 ),
+                                  //                                               )
+                                  //                                             : const Icon(
+                                  //                                                 Icons.person,
+                                  //                                                 color: Colors.white,
+                                  //                                                 size: 50,
+                                  //                                               ),
+                                  //                                   ),
+                                  //                                 ],
+                                  //                               ),
+                                  //                               ImageUploader(
+                                  //                                 takeImage:
+                                  //                                     _takeImage,
+                                  //                                 pickImage:
+                                  //                                     _pickImage,
+                                  //                                 buttonText:
+                                  //                                     "Upload Profile Image",
+                                  //                               ),
+                                  //                             ],
+                                  //                           );
+                                  //                         },
+                                  //                       ),
+                                  //                       EditTextField(
+                                  //                         controller:
+                                  //                             nameController,
+                                  //                         labelText:
+                                  //                             'Full Name',
+                                  //                         hintText:
+                                  //                             'Enter your Full Name',
+                                  //                         validator: (value) {
+                                  //                           if (value!
+                                  //                               .isEmpty) {
+                                  //                             return "Please Enter your Full Name";
+                                  //                           } else {
+                                  //                             return null;
+                                  //                           }
+                                  //                         },
+                                  //                       ),
+                                  //                       EditTextField(
+                                  //                         controller:
+                                  //                             contactNumberController,
+                                  //                         labelText:
+                                  //                             'Mobile Number',
+                                  //                         hintText:
+                                  //                             'Enter your Mobile Number',
+                                  //                         keyboardType:
+                                  //                             TextInputType
+                                  //                                 .number,
+                                  //                         inputFormatters: [
+                                  //                           FilteringTextInputFormatter
+                                  //                               .digitsOnly,
+                                  //                         ],
+                                  //                         validator: (value) {
+                                  //                           if (value!
+                                  //                               .isEmpty) {
+                                  //                             return "Please Enter your Mobile Number";
+                                  //                           } else if (value
+                                  //                                   .length !=
+                                  //                               11) {
+                                  //                             return "Please Enter the Correct Mobile Number";
+                                  //                           } else if (!value
+                                  //                               .startsWith(
+                                  //                                   '09')) {
+                                  //                             return "Please Enter the Correct Mobile Number";
+                                  //                           } else {
+                                  //                             return null;
+                                  //                           }
+                                  //                         },
+                                  //                       ),
+                                  //                       EditTextField(
+                                  //                         controller:
+                                  //                             addressController,
+                                  //                         labelText: 'Address',
+                                  //                         hintText:
+                                  //                             'Enter your Address',
+                                  //                         validator: (value) {
+                                  //                           if (value!
+                                  //                               .isEmpty) {
+                                  //                             return "Please Enter your Address";
+                                  //                           } else {
+                                  //                             return null;
+                                  //                           }
+                                  //                         },
+                                  //                       ),
+                                  //                       EditTextField(
+                                  //                         controller:
+                                  //                             emailController,
+                                  //                         labelText:
+                                  //                             'Email Address',
+                                  //                         hintText:
+                                  //                             'Enter your Email Address',
+                                  //                         validator: (value) {
+                                  //                           if (value!
+                                  //                               .isEmpty) {
+                                  //                             return "Please Enter Email Address";
+                                  //                           } else if (!RegExp(
+                                  //                                   r'^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$')
+                                  //                               .hasMatch(
+                                  //                                   value)) {
+                                  //                             return "Please Enter Correct Email Address";
+                                  //                           } else {
+                                  //                             return null;
+                                  //                           }
+                                  //                         },
+                                  //                       ),
+                                  //                     ],
+                                  //                   ),
+                                  //                 ),
+                                  //               );
+                                  //             },
+                                  //           ),
+                                  //           actions: [
+                                  //             TextButton(
+                                  //               onPressed: () {
+                                  //                 Navigator.of(context).pop();
+                                  //               },
+                                  //               style: TextButton.styleFrom(
+                                  //                 foregroundColor:
+                                  //                     const Color(0xFF050404)
+                                  //                         .withOpacity(0.7),
+                                  //               ),
+                                  //               child: const Text('Cancel'),
+                                  //             ),
+                                  //             TextButton(
+                                  //               onPressed: () async {
+                                  //                 if (formKey.currentState!
+                                  //                     .validate()) {
+                                  //                   String name =
+                                  //                       nameController.text;
+                                  //                   String contactNumber =
+                                  //                       contactNumberController
+                                  //                           .text;
+                                  //                   String address =
+                                  //                       addressController.text;
+                                  //                   String email =
+                                  //                       emailController.text;
+                                  //                   Navigator.of(context).pop();
+
+                                  //                   await updateUserProfile(
+                                  //                       userId!,
+                                  //                       name,
+                                  //                       contactNumber,
+                                  //                       address,
+                                  //                       email);
+                                  //                 }
+                                  //               },
+                                  //               style: TextButton.styleFrom(
+                                  //                 foregroundColor:
+                                  //                     const Color(0xFF050404)
+                                  //                         .withOpacity(0.9),
+                                  //               ),
+                                  //               child: const Text(
+                                  //                 'Save',
+                                  //                 style: TextStyle(
+                                  //                     fontWeight:
+                                  //                         FontWeight.bold),
+                                  //               ),
+                                  //             ),
+                                  //           ],
+                                  //         );
+                                  //       },
+                                  //     );
+                                  //   },
+                                  //   text: 'Edit Personal Information',
+                                  // ),
+                                  // const SizedBox(height: 5),
                                   ProfileButton(
                                     onPressed: () async {
                                       showDialog(
@@ -488,6 +788,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         builder: (BuildContext context) {
                                           passwordController.clear();
                                           return AlertDialog(
+                                            backgroundColor: Colors.white,
                                             title: const Center(
                                               child: Text(
                                                 'Change Password',
@@ -536,7 +837,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                                   Navigator.of(context).pop();
                                                 },
                                                 style: TextButton.styleFrom(
-                                                  backgroundColor:
+                                                  foregroundColor:
                                                       const Color(0xFF050404)
                                                           .withOpacity(0.7),
                                                 ),
@@ -554,7 +855,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                                   }
                                                 },
                                                 style: TextButton.styleFrom(
-                                                  backgroundColor:
+                                                  foregroundColor:
                                                       const Color(0xFF050404)
                                                           .withOpacity(0.9),
                                                 ),
@@ -601,6 +902,7 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Colors.white,
           title: const Center(
             child: Text(
               "Logout Account",
@@ -626,7 +928,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 Navigator.of(context).pop();
               },
               style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFF050404).withOpacity(0.7),
+                foregroundColor: const Color(0xFF050404).withOpacity(0.7),
               ),
               child: const Text('Cancel'),
             ),
@@ -636,7 +938,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 Navigator.pushNamed(context, '/login');
               },
               style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFFd41111).withOpacity(0.8),
+                foregroundColor: const Color(0xFFd41111).withOpacity(0.8),
               ),
               child: const Text('Logout'),
             ),
@@ -699,37 +1001,5 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ],
     );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    String? userId = Provider.of<UserProvider>(context).userId;
-    if (userId != null) {
-      return FutureBuilder<Map<String, dynamic>>(
-        future: _userDetailsFuture,
-        builder: (context, snapshot) {
-          print('Connection State: ${snapshot.connectionState}');
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            print('Waiting for data...');
-            return Center(
-              child: LoadingAnimationWidget.flickr(
-                leftDotColor: const Color(0xFF050404).withOpacity(0.8),
-                rightDotColor: const Color(0xFFd41111).withOpacity(0.8),
-                size: 40,
-              ),
-            );
-          } else if (snapshot.hasError || snapshot.data == null) {
-            print('Error loading user details: ${snapshot.error}');
-            return const Text('Error loading user details');
-          } else {
-            Map<String, dynamic> userDetails = snapshot.data!;
-            print('User details loaded successfully: $userDetails');
-            return buildProfileWidget(userDetails, userId);
-          }
-        },
-      );
-    } else {
-      return const Text('User ID not available');
-    }
   }
 }

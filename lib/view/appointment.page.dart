@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:retailer_app/routes/app_routes.dart';
-import 'package:retailer_app/view/profile.page.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:retailer_app/widgets/custom_button.dart';
@@ -99,6 +98,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
             context: context,
             builder: (context) {
               return AlertDialog(
+                backgroundColor: Colors.white,
                 title: const Center(
                   child: Text(
                     'Invalid Time',
@@ -108,17 +108,19 @@ class _AppointmentPageState extends State<AppointmentPage> {
                     ),
                   ),
                 ),
-                content: Text(
-                    'Please select a time between store hours 7:00 AM and 7:00 PM.'),
+                content: const Text(
+                  'Please select a time between store hours 7:00 AM and 7:00 PM.',
+                  textAlign: TextAlign.center,
+                ),
                 actions: [
                   TextButton(
                     onPressed: () {
                       Navigator.pop(context);
                     },
                     style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFF050404).withOpacity(0.8),
+                      foregroundColor: const Color(0xFF050404).withOpacity(0.8),
                     ),
-                    child: Text('OK'),
+                    child: const Text('OK'),
                   ),
                 ],
               );
@@ -148,6 +150,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
+            backgroundColor: Colors.white,
             title: const Center(
               child: Text(
                 'Confirm Appointment',
@@ -181,7 +184,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
                   Navigator.of(context).pop();
                 },
                 style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFF050404).withOpacity(0.7),
+                  foregroundColor: const Color(0xFF050404).withOpacity(0.7),
                 ),
                 child: const Text('Cancel'),
               ),
@@ -203,9 +206,8 @@ class _AppointmentPageState extends State<AppointmentPage> {
 
                       dateController.clear();
 
-                      showCustomOverlay(context, 'Appointment confirmed!');
-
-                      Navigator.pushNamed(context, dashboardRoute);
+                      Navigator.pushNamed(context, dashboardRoute,
+                          arguments: 3);
                     } else {
                       print(
                           'Failed to update appointment. Status code: ${response.statusCode}');
@@ -215,7 +217,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
                   }
                 },
                 style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFF050404).withOpacity(0.9),
+                  foregroundColor: const Color(0xFF050404).withOpacity(0.9),
                 ),
                 child: const Text(
                   'Confirm',
@@ -231,6 +233,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
         context: context,
         builder: (context) {
           return AlertDialog(
+            backgroundColor: Colors.white,
             title: const Center(
               child: Text(
                 'Invalid Time',
@@ -241,14 +244,16 @@ class _AppointmentPageState extends State<AppointmentPage> {
               ),
             ),
             content: const Text(
-                'Please select a time between store hours 7:00 AM and 7:00 PM.'),
+              'Please select a time between store hours 7:00 AM and 7:00 PM.',
+              textAlign: TextAlign.center,
+            ),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
                 },
                 style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFF050404).withOpacity(0.9),
+                  foregroundColor: const Color(0xFF050404).withOpacity(0.9),
                 ),
                 child: const Text('OK'),
               ),
@@ -290,6 +295,12 @@ class _AppointmentPageState extends State<AppointmentPage> {
             color: Colors.black,
             height: 0.2,
           ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, dashboardRoute);
+          },
         ),
       ),
       backgroundColor: Colors.white,
@@ -378,46 +389,4 @@ class _AppointmentPageState extends State<AppointmentPage> {
       ),
     );
   }
-}
-
-void showCustomOverlay(BuildContext context, String message) {
-  final overlay = OverlayEntry(
-    builder: (context) => Positioned(
-      top: MediaQuery.of(context).size.height * 0.5,
-      left: 20,
-      right: 20,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade300,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF050404).withOpacity(0.5),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Text(
-            message,
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-    ),
-  );
-
-  Overlay.of(context)!.insert(overlay);
-
-  Future.delayed(const Duration(seconds: 2), () {
-    overlay.remove();
-  });
 }

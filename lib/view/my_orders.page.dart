@@ -1,8 +1,10 @@
 import 'package:retailer_app/widgets/custom_button.dart';
+import 'package:retailer_app/widgets/custom_text.dart';
 import 'package:retailer_app/widgets/fullscreen_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'user_provider.dart';
@@ -18,9 +20,10 @@ class Transaction {
   final String name;
   final String contactNumber;
   final String houseLotBlk;
+  final String barangay;
   final String paymentMethod;
   final String status;
-  final String assembly;
+  final bool assembly;
   final String deliveryDate;
   final double total;
   final String cancelReason;
@@ -40,6 +43,7 @@ class Transaction {
     required this.name,
     required this.contactNumber,
     required this.houseLotBlk,
+    required this.barangay,
     required this.paymentMethod,
     required this.assembly,
     required this.status,
@@ -65,100 +69,119 @@ class MyOrderPage extends StatefulWidget {
 class _MyOrderPageState extends State<MyOrderPage> {
   List<Transaction> visibleTransactions = [];
 
+  bool _mounted = true;
+  bool loadingData = false;
+
+  @override
+  void dispose() {
+    _mounted = false;
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
 
+    loadingData = true;
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final userId = userProvider.userId;
 
-    if (userId != null) {
-      fetchTransactions(userId);
+    if (_mounted) {
+      if (userId != null) {
+        fetchTransactions(userId);
+      }
     }
   }
 
   void reloadTransactions() {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final userId = userProvider.userId;
-
-    if (userId != null) {
-      fetchTransactions(userId);
+    if (_mounted) {
+      if (userId != null) {
+        fetchTransactions(userId);
+      }
     }
   }
 
   Future<void> fetchTransactions(String userId) async {
-    final apiUrl = 'https://lpg-api-06n8.onrender.com/api/v1/transactions';
+    try {
+      final apiUrl =
+          'https://lpg-api-06n8.onrender.com/api/v1/transactions/?filter={"to":"$userId","__t":"Delivery","hasFeedback":false,"deleted":false}&limit=300';
 
-    final filterQuery =
-        '{"to": "$userId", "__t": "Delivery", "hasFeedback": false, "deleted": false}';
+      final response = await http.get(Uri.parse(apiUrl));
 
-    final searchUrl = '$apiUrl/?filter=$filterQuery&limit=300';
+      if (response.statusCode == 200) {
+        final Map<String, dynamic>? data = jsonDecode(response.body);
+        print(response.body);
+        if (data != null && data['status'] == 'success') {
+          final List<dynamic> transactionsData = data['data'] ?? [];
 
-    final response = await http.get(Uri.parse(searchUrl));
+          transactionsData.sort((a, b) {
+            DateTime dateTimeA = DateTime.parse(a['updatedAt']);
+            DateTime dateTimeB = DateTime.parse(b['updatedAt']);
+            return dateTimeB.compareTo(dateTimeA);
+          });
 
-    if (response.statusCode == 200) {
-      final Map<String, dynamic>? data = jsonDecode(response.body);
-      print(response.body);
-      if (data != null && data['status'] == 'success') {
-        final List<dynamic> transactionsData = data['data'] ?? [];
-
-        transactionsData.sort((a, b) {
-          DateTime dateTimeA = DateTime.parse(a['updatedAt']);
-          DateTime dateTimeB = DateTime.parse(b['updatedAt']);
-          return dateTimeB.compareTo(dateTimeA);
-        });
-
-        setState(() {
-          visibleTransactions = transactionsData
-              .where((transactionData) =>
-                  transactionData['status'] == 'Pending' ||
-                  transactionData['status'] == 'Approved' ||
-                  transactionData['status'] == 'On Going' ||
-                  transactionData['status'] == 'Cancelled' ||
-                  transactionData['status'] == 'Completed' &&
-                      transactionData['hasFeedback'] == false &&
-                      transactionData['deleted'] == false)
-              .map((transactionData) => Transaction(
-                    deliveryLocation: transactionData['deliveryLocation'],
-                    retailerPrice: transactionData['retailerPrice'] != null
-                        ? transactionData['retailerPrice'].toString()
-                        : '',
-                    isApproved: transactionData['isApproved'],
-                    id: transactionData['_id'],
-                    name: transactionData['name'],
-                    contactNumber: transactionData['contactNumber'],
-                    houseLotBlk: transactionData['houseLotBlk'],
-                    paymentMethod: transactionData['paymentMethod'],
-                    assembly: transactionData['assembly'] is bool
-                        ? transactionData['assembly'].toString()
-                        : transactionData['assembly'],
-                    status: transactionData['status'],
-                    cancelReason: transactionData['cancelReason'] != null
-                        ? transactionData['cancelReason'].toString()
-                        : '',
-                    deliveryDate: transactionData['deliveryDate'] != null
-                        ? transactionData['deliveryDate'].toString()
-                        : '',
-                    discountIdImage: transactionData['discountIdImage'] != null
-                        ? transactionData['discountIdImage'].toString()
-                        : '',
-                    total: transactionData['total'].toDouble(),
-                    createdAt: transactionData['createdAt'],
-                    items: (transactionData['items'] as List<dynamic>?)
-                            ?.map<Map<String, dynamic>>((item) =>
-                                item is Map<String, dynamic> ? item : {})
-                            .toList() ??
-                        [],
-                    completed: transactionData['completed'],
-                    pickupImages: transactionData['pickupImages'],
-                    hasFeedback: transactionData['hasFeedback'],
-                    cancellationImages: transactionData['cancellationImages'],
-                    completionImages: transactionData['completionImages'],
-                  ))
-              .toList();
-        });
+          setState(() {
+            visibleTransactions = transactionsData
+                .where((transactionData) =>
+                    transactionData['status'] == 'Pending' ||
+                    transactionData['status'] == 'Declined' ||
+                    transactionData['status'] == 'Archived' ||
+                    transactionData['status'] == 'Approved' ||
+                    transactionData['status'] == 'On Going' ||
+                    transactionData['status'] == 'Cancelled' ||
+                    transactionData['status'] == 'Completed' &&
+                        transactionData['hasFeedback'] == false &&
+                        transactionData['deleted'] == false)
+                .map((transactionData) => Transaction(
+                      deliveryLocation: transactionData['deliveryLocation'],
+                      retailerPrice: transactionData['retailerPrice'] != null
+                          ? transactionData['retailerPrice'].toString()
+                          : '',
+                      isApproved: transactionData['isApproved'],
+                      id: transactionData['_id'],
+                      name: transactionData['name'],
+                      contactNumber: transactionData['contactNumber'],
+                      houseLotBlk: transactionData['houseLotBlk'],
+                      barangay: transactionData['barangay'],
+                      paymentMethod: transactionData['paymentMethod'],
+                      assembly: transactionData['assembly'],
+                      status: transactionData['status'],
+                      cancelReason: transactionData['cancelReason'] != null
+                          ? transactionData['cancelReason'].toString()
+                          : '',
+                      deliveryDate: transactionData['deliveryDate'] != null
+                          ? transactionData['deliveryDate'].toString()
+                          : '',
+                      discountIdImage:
+                          transactionData['discountIdImage'] != null
+                              ? transactionData['discountIdImage'].toString()
+                              : '',
+                      total: transactionData['total'].toDouble(),
+                      createdAt: transactionData['createdAt'],
+                      items: (transactionData['items'] as List<dynamic>?)
+                              ?.map<Map<String, dynamic>>((item) =>
+                                  item is Map<String, dynamic> ? item : {})
+                              .toList() ??
+                          [],
+                      completed: transactionData['completed'],
+                      pickupImages: transactionData['pickupImages'],
+                      hasFeedback: transactionData['hasFeedback'],
+                      cancellationImages: transactionData['cancellationImages'],
+                      completionImages: transactionData['completionImages'],
+                    ))
+                .toList();
+          });
+        } else {}
       } else {}
-    } else {}
+    } catch (e) {
+      if (_mounted) {
+        print("Error: $e");
+      }
+    } finally {
+      loadingData = false;
+    }
   }
 
   Future<void> cancelTransaction(String transactionId) async {
@@ -168,7 +191,7 @@ class _MyOrderPageState extends State<MyOrderPage> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({'status': "Cancelled", '__t': 'Delivery'}),
+      body: jsonEncode({'status': "Archived", '__t': 'Delivery'}),
     );
 
     if (response.statusCode == 200) {
@@ -181,6 +204,7 @@ class _MyOrderPageState extends State<MyOrderPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         elevation: 1,
         title: Text(
@@ -202,47 +226,65 @@ class _MyOrderPageState extends State<MyOrderPage> {
             height: 0.2,
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushReplacementNamed(context, dashboardRoute);
-          },
-        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long_outlined),
+            onPressed: () {
+              Navigator.pushReplacementNamed(context, historyRoute);
+            },
+          ),
+        ],
       ),
       backgroundColor: Colors.white,
-      body: RefreshIndicator(
-        color: const Color(0xFF050404),
-        strokeWidth: 2.5,
-        onRefresh: () async {
-          final userProvider =
-              Provider.of<UserProvider>(context, listen: false);
-          final userId = userProvider.userId;
+      body: loadingData
+          ? Center(
+              child: LoadingAnimationWidget.flickr(
+                leftDotColor: const Color(0xFF050404).withOpacity(0.8),
+                rightDotColor: const Color(0xFFd41111).withOpacity(0.8),
+                size: 40,
+              ),
+            )
+          : RefreshIndicator(
+              color: const Color(0xFF050404),
+              strokeWidth: 2.5,
+              onRefresh: () async {
+                final userProvider =
+                    Provider.of<UserProvider>(context, listen: false);
+                final userId = userProvider.userId;
 
-          if (userId != null) {
-            await fetchTransactions(userId);
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: ListView(
-            children: [
-              for (int i = 0; i < visibleTransactions.length; i++)
-                GestureDetector(
-                  onTap: () {},
-                  child: TransactionCard(
-                    transaction: visibleTransactions[i],
-                    onDeleteTransaction: () {
-                      cancelTransaction(visibleTransactions[i].id);
-                      reloadTransactions();
-                    },
-                    reloadTransactions: reloadTransactions,
-                    orderNumber: visibleTransactions.length - i,
+                if (userId != null) {
+                  await fetchTransactions(userId);
+                }
+              },
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: ListView(
+                        children: [
+                          const SizedBox(height: 20),
+                          for (int i = 0; i < visibleTransactions.length; i++)
+                            GestureDetector(
+                              onTap: () {},
+                              child: TransactionCard(
+                                transaction: visibleTransactions[i],
+                                onDeleteTransaction: () {
+                                  cancelTransaction(visibleTransactions[i].id);
+                                  reloadTransactions();
+                                },
+                                reloadTransactions: reloadTransactions,
+                                orderNumber: visibleTransactions.length - i,
+                              ),
+                            ),
+                          const SizedBox(height: 10),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-            ],
-          ),
-        ),
-      ),
+                ],
+              ),
+            ),
     );
   }
 }
@@ -250,15 +292,14 @@ class _MyOrderPageState extends State<MyOrderPage> {
 class TransactionCard extends StatefulWidget {
   final Transaction transaction;
   final VoidCallback onDeleteTransaction;
-  final VoidCallback reloadTransactions; // Add this line
+  final VoidCallback reloadTransactions;
 
   final int orderNumber;
 
   TransactionCard({
     required this.transaction,
     required this.onDeleteTransaction,
-    required this.reloadTransactions, // Add this line
-
+    required this.reloadTransactions,
     required this.orderNumber,
   });
 
@@ -277,6 +318,8 @@ class _TransactionCardState extends State<TransactionCard> {
   Color getCancelOrderButtonColor() {
     return widget.transaction.status.toString() == "On Going" ||
             widget.transaction.status.toString() == "Approved" ||
+            widget.transaction.status.toString() == "Declined" ||
+            widget.transaction.status.toString() == "Archived" ||
             widget.transaction.status.toString() == "Completed" ||
             widget.transaction.status.toString() == "Cancelled"
         ? const Color(0xFF050404).withOpacity(0.1)
@@ -305,6 +348,7 @@ class _TransactionCardState extends State<TransactionCard> {
       child: Column(
         children: [
           Card(
+            color: Colors.white,
             elevation: 4,
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -322,7 +366,9 @@ class _TransactionCardState extends State<TransactionCard> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (widget.transaction.status != "Cancelled")
+                      if (widget.transaction.status != "Cancelled" &&
+                          widget.transaction.status != "Declined" &&
+                          widget.transaction.status != "Archived")
                         Text(
                           "₱${widget.transaction.total % 1 == 0 ? NumberFormat('#,##0').format(widget.transaction.total.toInt()) : NumberFormat('#,##0.00').format(widget.transaction.total).replaceAll(RegExp(r"([.]*0)(?!.*\d)"), "")}",
                           style: TextStyle(
@@ -331,7 +377,9 @@ class _TransactionCardState extends State<TransactionCard> {
                             color: const Color(0xFF050404).withOpacity(0.9),
                           ),
                         ),
-                      if (widget.transaction.status == "Cancelled")
+                      if (widget.transaction.status == "Declined" ||
+                          widget.transaction.status == "Cancelled" ||
+                          widget.transaction.status == "Archived")
                         IconButton(
                           icon: Icon(
                             Icons.close,
@@ -342,6 +390,7 @@ class _TransactionCardState extends State<TransactionCard> {
                               context: context,
                               builder: (BuildContext context) {
                                 return AlertDialog(
+                                  backgroundColor: Colors.white,
                                   title: const Center(
                                     child: Text(
                                       "Confirmation",
@@ -352,14 +401,16 @@ class _TransactionCardState extends State<TransactionCard> {
                                     ),
                                   ),
                                   content: const Text(
-                                      "Are you sure you want to Remove this Transaction?"),
+                                    "Are you sure you want to Remove this Transaction?",
+                                    textAlign: TextAlign.center,
+                                  ),
                                   actions: <Widget>[
                                     TextButton(
                                       onPressed: () {
                                         Navigator.of(context).pop();
                                       },
                                       style: TextButton.styleFrom(
-                                        backgroundColor: const Color(0xFF050404)
+                                        foregroundColor: const Color(0xFF050404)
                                             .withOpacity(0.8),
                                       ),
                                       child: const Text("Cancel"),
@@ -370,7 +421,7 @@ class _TransactionCardState extends State<TransactionCard> {
                                             widget.transaction.id);
                                       },
                                       style: TextButton.styleFrom(
-                                        backgroundColor: const Color(0xFFd41111)
+                                        foregroundColor: const Color(0xFFd41111)
                                             .withOpacity(0.9),
                                       ),
                                       child: const Text("Remove"),
@@ -384,46 +435,21 @@ class _TransactionCardState extends State<TransactionCard> {
                     ],
                   ),
                   const Divider(),
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        const TextSpan(
-                          text: "Status: ",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        TextSpan(
-                          text: widget.transaction.status,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: const Color(0xFF050404).withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
+                  TitleMediumText(
+                    text: widget.transaction.status == 'Archived'
+                        ? 'Status: Cancelled (Me)'
+                        : widget.transaction.status == 'Cancelled' &&
+                                widget.transaction.cancelReason != null &&
+                                widget.transaction.cancelReason.isNotEmpty
+                            ? 'Status: Failed'
+                            : 'Status: ${widget.transaction.status}',
                   ),
                   if (widget.transaction.cancelReason != null &&
                       widget.transaction.cancelReason.isNotEmpty)
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          const TextSpan(
-                            text: "Reason/s: ",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          TextSpan(
-                            text: widget.transaction.cancelReason,
-                            style: const TextStyle(
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
+                    TitleMediumOver(
+                      text: widget.transaction.status == 'Declined'
+                          ? 'Admin Reason/s: ${widget.transaction.cancelReason}'
+                          : 'Delivery Driver Reason/s: ${widget.transaction.cancelReason}',
                     ),
                   const SizedBox(height: 15),
                   CustomButton(
@@ -444,13 +470,15 @@ class _TransactionCardState extends State<TransactionCard> {
                   CustomButton(
                     backgroundColor: getCancelOrderButtonColor(),
                     onPressed: (widget.transaction.status == 'Approved' ||
-                            widget.transaction.status == 'Cancelled')
+                            widget.transaction.status == 'Cancelled' ||
+                            widget.transaction.status == 'Archived')
                         ? () {}
                         : () {
                             showDialog(
                               context: context,
                               builder: (BuildContext context) {
                                 return AlertDialog(
+                                  backgroundColor: Colors.white,
                                   title: const Center(
                                     child: Text(
                                       "Confirmation",
@@ -461,14 +489,16 @@ class _TransactionCardState extends State<TransactionCard> {
                                     ),
                                   ),
                                   content: const Text(
-                                      "Are you sure you want to Cancel this Order?"),
+                                    "Are you sure you want to Cancel this Order?",
+                                    textAlign: TextAlign.center,
+                                  ),
                                   actions: [
                                     TextButton(
                                       onPressed: () {
                                         Navigator.of(context).pop();
                                       },
                                       style: TextButton.styleFrom(
-                                        backgroundColor: const Color(0xFF050404)
+                                        foregroundColor: const Color(0xFF050404)
                                             .withOpacity(0.8),
                                       ),
                                       child: const Text("No"),
@@ -480,7 +510,7 @@ class _TransactionCardState extends State<TransactionCard> {
                                         widget.reloadTransactions();
                                       },
                                       style: TextButton.styleFrom(
-                                        backgroundColor: const Color(0xFFd41111)
+                                        foregroundColor: const Color(0xFFd41111)
                                             .withOpacity(0.9),
                                       ),
                                       child: const Text("Cancel Order"),
@@ -534,171 +564,77 @@ class TransactionDetailsModal extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Text(
-              'Transaction Number:',
+              'Transaction ID:',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
               transaction.id,
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 5),
             const Divider(),
-            const SizedBox(height: 5),
-            Row(
-              children: [
-                const Text(
-                  'Transaction Status: ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(transaction.status),
-              ],
-            ),
-            if (transaction.cancelReason.isNotEmpty)
-              Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            const TextSpan(
-                              text: 'Reason: ',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            TextSpan(
-                              text: transaction.cancelReason,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(),
-                ],
-              ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 2),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            const WidgetSpan(
-                              child: const Icon(Icons.perm_identity_outlined),
-                            ),
-                            TextSpan(
-                              text: ' : ${transaction.name}',
-                            ),
-                          ],
-                        ),
-                        textAlign: TextAlign.start,
-                      ),
-                    ),
-                  ],
+                BodyMediumText(
+                  text: transaction.status == 'Archived'
+                      ? 'Status: Cancelled (Me)'
+                      : transaction.status == 'Cancelled' &&
+                              transaction.cancelReason != null &&
+                              transaction.cancelReason.isNotEmpty
+                          ? 'Status: Failed'
+                          : 'Status: ${transaction.status}',
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            const WidgetSpan(
-                              child: const Icon(Icons.phone_rounded),
-                            ),
-                            TextSpan(
-                              text: ' : ${transaction.contactNumber}',
-                            ),
-                          ],
-                        ),
-                        textAlign: TextAlign.start,
-                      ),
-                    ),
-                  ],
+                if (transaction.cancelReason != null &&
+                    transaction.cancelReason.isNotEmpty)
+                  BodyMediumOver(
+                    text: transaction.status == 'Declined'
+                        ? 'Admin Reason/s: ${transaction.cancelReason}'
+                        : 'Delivery Driver Reason/s: ${transaction.cancelReason}',
+                  ),
+                const Divider(),
+                const Center(
+                  child: BodyMedium(
+                    text: 'Receiver Information:',
+                  ),
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            const WidgetSpan(
-                              child: Icon(Icons.location_on_outlined),
-                            ),
-                            TextSpan(
-                              text: ' : ${transaction.deliveryLocation}',
-                            ),
-                          ],
-                        ),
-                        textAlign: TextAlign.start,
-                      ),
-                    ),
-                  ],
+                BodyMediumText(
+                  text: 'Name: ${transaction.name}',
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            const WidgetSpan(
-                              child: Icon(Icons.house_outlined),
-                            ),
-                            TextSpan(
-                              text: ' : ${transaction.houseLotBlk}',
-                            ),
-                          ],
-                        ),
-                        textAlign: TextAlign.start,
-                      ),
-                    ),
-                  ],
+                BodyMediumText(
+                  text: 'Mobile Number: ${transaction.contactNumber}',
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(Icons.payment_outlined),
-                    Text(' : ${transaction.paymentMethod}'),
-                  ],
+                BodyMediumOver(
+                  text: 'House Number: ${transaction.houseLotBlk}',
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Text(
-                      'Assemble Option: ',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      transaction.paymentMethod.isNotEmpty ? 'Yes' : 'No',
-                    ),
-                  ],
+                BodyMediumText(
+                  text: 'Barangay: ${transaction.barangay}',
                 ),
-                Row(
-                  children: [
-                    const Text(
-                      'Applying for Discount: ',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      transaction.discountIdImage.isNotEmpty ? 'Yes' : 'No',
-                    ),
-                  ],
+                BodyMediumOver(
+                  text: 'Delivery Location: ${transaction.deliveryLocation}',
+                ),
+                const Divider(),
+                BodyMediumText(
+                  text: 'Payment Method: ${transaction.paymentMethod}',
+                ),
+                BodyMediumOver(
+                    text:
+                        'Delivery Date and Time: ${DateFormat('MMMM d, y - h:mm a ').format(
+                  DateTime.parse(transaction.deliveryDate),
+                )} '),
+                BodyMediumText(
+                  text:
+                      'Assemble Option: ${transaction.assembly ? 'Yes' : 'No'}',
+                ),
+                BodyMediumText(
+                  text:
+                      'Applying for Discount: ${transaction.discountIdImage.isNotEmpty ? 'Yes' : 'No'}',
                 ),
                 if (transaction.discountIdImage.isNotEmpty)
                   Column(
@@ -737,57 +673,26 @@ class TransactionDetailsModal extends StatelessWidget {
                       const SizedBox(height: 5),
                     ],
                   ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            const TextSpan(
-                              text: 'Items: ',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            if (transaction.items != null)
-                              TextSpan(
-                                text: transaction.items!.map((item) {
-                                  if (item is Map<String, dynamic> &&
-                                      item.containsKey('name') &&
-                                      item.containsKey('quantity')) {
-                                    return '${item['name']} (${item['quantity']})';
-                                  }
-                                  return '';
-                                }).join(', '),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 10),
+                BodyMediumOver(
+                  text: 'Items: ${transaction.items!.map((item) {
+                    if (item is Map<String, dynamic> &&
+                        item.containsKey('name') &&
+                        item.containsKey('quantity') &&
+                        item.containsKey('retailerPrice')) {
+                      final itemName = item['name'];
+                      final quantity = item['quantity'];
+                      final price = NumberFormat.decimalPattern().format(
+                          double.parse(
+                              (item['retailerPrice']).toStringAsFixed(2)));
+
+                      return '$itemName ₱$price (x$quantity)';
+                    }
+                  }).join(', ')}',
                 ),
-                Row(
-                  children: [
-                    const Text('Total Price: ',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15)),
-                    Text(
-                      "₱${transaction.total % 1 == 0 ? NumberFormat('#,##0').format(transaction.total.toInt()) : NumberFormat('#,##0.00').format(transaction.total).replaceAll(RegExp(r"([.]*0)(?!.*\d)"), "")}",
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    const Text(
-                      'Delivery Date/Time: ',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      transaction.deliveryDate != ""
-                          ? DateFormat('MMM d, y - h:mm a ').format(
-                              DateTime.parse(transaction.deliveryDate!),
-                            )
-                          : "Not Picked the Date/Time",
-                    ),
-                  ],
+                BodyMediumText(
+                  text:
+                      'Total Price: ₱${transaction.total % 1 == 0 ? NumberFormat('#,##0').format(transaction.total.toInt()) : NumberFormat('#,##0.00').format(transaction.total).replaceAll(RegExp(r"([.]*0)(?!.*\d)"), "")}',
                 ),
                 if (transaction.pickupImages != "" ||
                     transaction.cancellationImages != "" ||
@@ -798,14 +703,14 @@ class TransactionDetailsModal extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          Column(
-                            children: [
-                              const Text(
-                                'Pick-up Image',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 5),
-                              if (transaction.pickupImages != "")
+                          if (transaction.pickupImages != "")
+                            Column(
+                              children: [
+                                const Text(
+                                  'Pick-up Image',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 5),
                                 GestureDetector(
                                   onTap: () {
                                     Navigator.push(
@@ -831,18 +736,16 @@ class TransactionDetailsModal extends StatelessWidget {
                                     ),
                                   ),
                                 )
-                              else
-                                const Text(''),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              const Text(
-                                'Drop-off Image',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 5),
-                              if (transaction.completionImages != "")
+                              ],
+                            ),
+                          if (transaction.completionImages != "")
+                            Column(
+                              children: [
+                                const Text(
+                                  'Drop-off Image',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 5),
                                 GestureDetector(
                                   onTap: () {
                                     Navigator.push(
@@ -869,10 +772,8 @@ class TransactionDetailsModal extends StatelessWidget {
                                     ),
                                   ),
                                 )
-                              else
-                                const Text(''),
-                            ],
-                          ),
+                              ],
+                            ),
                           if (transaction.cancellationImages != "")
                             Column(
                               children: [

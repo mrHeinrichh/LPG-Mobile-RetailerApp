@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:retailer_app/routes/app_routes.dart';
 import 'package:retailer_app/view/my_orders.page.dart';
 import 'package:retailer_app/widgets/text_field.dart';
@@ -363,6 +362,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                           context: context,
                           builder: (BuildContext context) {
                             return AlertDialog(
+                              backgroundColor: Colors.white,
                               title: const Center(
                                 child: Text(
                                   'Rating Error',
@@ -374,6 +374,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                               ),
                               content: const Text(
                                 "Please ensure that you have selected and provided ratings for all categories.",
+                                textAlign: TextAlign.center,
                               ),
                               actions: [
                                 TextButton(
@@ -381,7 +382,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                     Navigator.of(context).pop();
                                   },
                                   style: TextButton.styleFrom(
-                                    backgroundColor: const Color(0xFF050404)
+                                    foregroundColor: const Color(0xFF050404)
                                         .withOpacity(0.8),
                                   ),
                                   child: const Text("OK"),
@@ -450,7 +451,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
         print("Feedback submitted successfully");
         print(response.body);
         print(response.statusCode);
-        Navigator.pushNamed(context, dashboardRoute);
+        Navigator.pushNamed(context, historyRoute);
       } else {
         print("Failed to submit feedback. Status code: ${response.statusCode}");
       }

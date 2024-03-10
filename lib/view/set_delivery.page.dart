@@ -3,12 +3,12 @@ import 'package:retailer_app/routes/app_routes.dart';
 import 'package:retailer_app/view/cart_provider.dart';
 import 'package:retailer_app/view/user_provider.dart';
 import 'package:retailer_app/widgets/custom_image_upload.dart';
+import 'package:retailer_app/widgets/custom_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:retailer_app/widgets/custom_button.dart';
-import 'package:retailer_app/widgets/custom_timepicker.dart';
 import 'package:retailer_app/widgets/location_button.dart';
 import 'package:retailer_app/widgets/location_search.dart';
 import 'package:retailer_app/widgets/text_field.dart';
@@ -187,13 +187,12 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
           "category": cartItem.category,
           "description": cartItem.description,
           "weight": cartItem.weight,
-          "stock": cartItem.availableStock,
+          "stock": cartItem.stock,
           "retailerPrice": cartItem.retailerPrice,
           // "retailerPrice": cartItem.retailerPrice,
           "image": cartItem.imageUrl,
           "type": cartItem.itemType,
-          "quantity": cartItem.stock,
-          //
+          "quantity": cartItem.quantity,
           // "totalPrice": cartItem.retailerPrice * cartItem.stock,
         });
       }
@@ -212,13 +211,33 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
         Provider.of<UserProvider>(context, listen: false);
     final String userId = userProvider.userId ?? '';
 
+    if (userId == null || userId.isEmpty) {
+      print('Error: User ID is null or empty.');
+      return;
+    }
+
     try {
+      Map<String, dynamic>? discountedUploadResponse;
+
+      if (_image != null) {
+        discountedUploadResponse = await uploadImageToServer(_image!);
+        print(
+            "Upload Response for Discounted Image: $discountedUploadResponse");
+
+        if (discountedUploadResponse != null) {
+          print("Discounted Image URL: ${discountedUploadResponse["url"]}");
+        } else {
+          print("Discounted Image upload failed");
+          return;
+        }
+      }
+
       final Map<String, dynamic> requestData = {
         "deliveryLocation": locationController.text,
         "houseLotBlk": houseNumberController.text,
         "paymentMethod": selectedPaymentMethod,
         "status": "Pending",
-        // "assembly": selectedAssemblyOption.toString(),
+        "assembly": selectedAssemblyOption.toString(),
         "deliveryDate": selectedDateTime.toString(),
         "barangay": selectedBarangay,
         // "total": "",
@@ -239,9 +258,11 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
         "name": nameController.text,
         "contactNumber": contactNumberController.text,
         "items": itemsList,
-        "discounted": "false",
+        "discounted": discountedUploadResponse != null ? true : false,
         "completed": "false",
-        // "discountIdImage": "",
+        "discountIdImage": discountedUploadResponse != null
+            ? discountedUploadResponse["url"]
+            : "",
         "__t": "Delivery",
         "priceType": "Retailer",
       };
@@ -514,7 +535,7 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                                   ),
                                   RadioListTile<String>(
                                     title: const Text('Gcash Payment'),
-                                    value: 'GCash',
+                                    value: 'GCASH',
                                     groupValue: selectedPaymentMethod,
                                     onChanged: (String? value) {
                                       setState(() {
@@ -621,6 +642,92 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 15),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          isSeniorCheckboxVisible = !isSeniorCheckboxVisible;
+                        });
+                      },
+                      child: const Text(
+                        "Avail Discount for PWD/Senior Citizen",
+                      ),
+                    ),
+                    if (isSeniorCheckboxVisible)
+                      Column(
+                        children: [
+                          const SizedBox(height: 10),
+                          StreamBuilder<File?>(
+                            stream: imageStreamController.stream,
+                            builder: (context, snapshot) {
+                              return Column(
+                                children: [
+                                  Stack(
+                                    alignment: Alignment.topRight,
+                                    children: [
+                                      Container(
+                                        width: double.infinity,
+                                        height: 200,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF050404)
+                                              .withOpacity(0.4),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        foregroundDecoration: snapshot.data !=
+                                                null
+                                            ? BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                image: DecorationImage(
+                                                  image:
+                                                      FileImage(snapshot.data!),
+                                                  fit: BoxFit.cover,
+                                                ),
+                                              )
+                                            : null,
+                                        child: snapshot.data == null
+                                            ? const Icon(
+                                                Icons.image,
+                                                color: Colors.white,
+                                                size: 50,
+                                              )
+                                            : null,
+                                      ),
+                                      if (snapshot.data != null)
+                                        GestureDetector(
+                                          onTap: () {
+                                            imageStreamController.add(null);
+                                            _image = null;
+                                          },
+                                          child: Container(
+                                            margin: const EdgeInsets.all(8),
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFd41111)
+                                                  .withOpacity(0.8),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  ImageUploader(
+                                    takeImage: _takeImage,
+                                    pickImage: _pickImage,
+                                    buttonText: "Upload your Discount Id Image",
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -655,10 +762,12 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                                 confirmDialog();
                               });
                             } else {
+                              // NONSENSE
                               showDialog(
                                 context: context,
                                 builder: (BuildContext context) {
                                   return AlertDialog(
+                                    backgroundColor: Colors.white,
                                     title: const Center(
                                       child: Text(
                                         'Invalid Time',
@@ -668,8 +777,9 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                                         ),
                                       ),
                                     ),
-                                    content: Text(
+                                    content: const Text(
                                       'Please select a time between 7 AM and 7 PM for delivery.',
+                                      textAlign: TextAlign.center,
                                     ),
                                     actions: [
                                       TextButton(
@@ -677,11 +787,11 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                                           Navigator.of(context).pop();
                                         },
                                         style: TextButton.styleFrom(
-                                          backgroundColor:
+                                          foregroundColor:
                                               const Color(0xFF050404)
                                                   .withOpacity(0.8),
                                         ),
-                                        child: Text('OK'),
+                                        child: const Text('OK'),
                                       ),
                                     ],
                                   );
@@ -694,7 +804,7 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                     },
                     text: 'Scheduled',
                     height: 50,
-                    width: 160,
+                    width: 170,
                     fontz: 20,
                   ),
                   CustomizedButton(
@@ -711,10 +821,12 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                           selectedDateTime = DateTime.now();
                           confirmDialog();
                         } else {
+                          // NONSENSE
                           showDialog(
                             context: context,
                             builder: (context) {
                               return AlertDialog(
+                                backgroundColor: Colors.white,
                                 title: const Center(
                                   child: Text(
                                     'Delivery Hours Notice',
@@ -725,14 +837,16 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                                   ),
                                 ),
                                 content: const Text(
-                                    'Sorry, your order cannot be delivered at the moment. Our delivery hours are from 7 AM to 7 PM daily.'),
+                                  'Sorry, your order cannot be delivered at the moment. Our delivery hours are from 7 AM to 7 PM daily.',
+                                  textAlign: TextAlign.center,
+                                ),
                                 actions: [
                                   TextButton(
                                     onPressed: () {
                                       Navigator.of(context).pop();
                                     },
                                     style: TextButton.styleFrom(
-                                      backgroundColor: const Color(0xFF050404)
+                                      foregroundColor: const Color(0xFF050404)
                                           .withOpacity(0.8),
                                     ),
                                     child: const Text('OK'),
@@ -746,12 +860,13 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                     },
                     text: 'Deliver Now',
                     height: 50,
-                    width: 160,
+                    width: 170,
                     fontz: 20,
                     enabled: true,
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
             ],
           ),
         ),
@@ -808,6 +923,7 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          backgroundColor: Colors.white,
           title: const Center(
             child: Text(
               'Delivery Confirmation',
@@ -821,126 +937,39 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Delivery Location: ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextSpan(
-                      text: locationController.text,
-                    ),
-                  ],
-                ),
+              const Center(
+                child: BodyMedium(text: "Receiver Information:"),
               ),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Receiver Name: ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextSpan(
-                      text: nameController.text,
-                    ),
-                  ],
-                ),
+              BodyMediumText(
+                text: 'Name: ${nameController.text}',
               ),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Receiver Contact Number: ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextSpan(
-                      text: contactNumberController.text,
-                    ),
-                  ],
-                ),
+              BodyMediumText(
+                text: 'Mobile Number: ${contactNumberController.text}',
               ),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Receiver House #/Lot/Blk: ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextSpan(
-                      text: houseNumberController.text,
-                    ),
-                  ],
-                ),
+              BodyMediumOver(
+                text: 'House Number: ${houseNumberController.text}',
               ),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Barangay: ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextSpan(
-                      text: selectedBarangay,
-                    ),
-                  ],
-                ),
+              BodyMediumText(
+                text: 'Barangay: $selectedBarangay',
               ),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: "Scheduled Date and Time: ",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextSpan(
-                      text: DateFormat('MMMM d, y, h:mm a')
-                          .format(selectedDateTime!),
-                    ),
-                  ],
-                ),
+              BodyMediumOver(
+                text: 'Delivery Location: ${locationController.text}',
               ),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Payment Method: ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextSpan(
-                      text: selectedPaymentMethod,
-                    ),
-                  ],
-                ),
+              const Divider(),
+              BodyMediumOver(
+                  text:
+                      'Delivery Date and Time: ${DateFormat('MMMM d, y - h:mm a ').format(
+                selectedDateTime!,
+              )} '),
+              BodyMediumText(
+                text:
+                    'Assemble Option: ${selectedAssemblyOption! ? 'Yes' : 'No'}',
               ),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Need to be Assembled: ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextSpan(
-                      text: selectedAssemblyOption! ? 'Yes' : 'No',
-                    ),
-                  ],
-                ),
+              BodyMediumText(
+                text: 'Payment Method: $selectedPaymentMethod',
+              ),
+              BodyMediumText(
+                text: 'Applying for Discount: ${_image != null ? 'Yes' : 'No'}',
               ),
             ],
           ),
@@ -950,7 +979,7 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                 Navigator.of(context).pop();
               },
               style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFF050404).withOpacity(0.7),
+                foregroundColor: const Color(0xFF050404).withOpacity(0.7),
               ),
               child: const Text('Cancel'),
             ),
@@ -960,10 +989,12 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
                 await sendTransactionData();
                 Provider.of<CartProvider>(currentContext, listen: false)
                     .clearCart();
-                Navigator.pushNamed(currentContext, myOrdersPage);
+
+                Navigator.pushNamed(currentContext, dashboardRoute,
+                    arguments: 1);
               },
               style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFF050404).withOpacity(0.9),
+                foregroundColor: const Color(0xFF050404).withOpacity(0.9),
               ),
               child: const Text(
                 'Confirm',
@@ -982,6 +1013,7 @@ void showAlertDialog(BuildContext context) {
     context: context,
     builder: (context) {
       return AlertDialog(
+        backgroundColor: Colors.white,
         title: const Center(
           child: Text(
             'Delivery Hours Notice',
@@ -1015,7 +1047,7 @@ void showAlertDialog(BuildContext context) {
               Navigator.of(context).pop();
             },
             style: TextButton.styleFrom(
-              backgroundColor: const Color(0xFF050404).withOpacity(0.8),
+              foregroundColor: const Color(0xFF050404).withOpacity(0.8),
             ),
             child: const Text('Ok, I Understand'),
           ),

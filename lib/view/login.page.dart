@@ -18,7 +18,7 @@ class _LoginPageState extends State<LoginPage> {
   TextEditingController emailController =
       TextEditingController(text: 'retailer@gmail.com');
   TextEditingController passwordController =
-      TextEditingController(text: 'retailer');
+      TextEditingController(text: 'admin');
 
   Future<Map<String, dynamic>> login(
       String? email, String? password, BuildContext context) async {
@@ -41,7 +41,7 @@ class _LoginPageState extends State<LoginPage> {
         body: jsonEncode({
           'email': email,
           'password': password,
-          'type': 'Retailer',
+          '__t': 'retailer',
         }),
       );
 
@@ -126,6 +126,7 @@ class _LoginPageState extends State<LoginPage> {
                                 context: context,
                                 builder: (context) {
                                   return AlertDialog(
+                                    backgroundColor: Colors.white,
                                     title: const Center(
                                       child: Text(
                                         'Login Failed',
@@ -141,7 +142,7 @@ class _LoginPageState extends State<LoginPage> {
                                         onPressed: () {
                                           Navigator.of(context).pop();
                                         },
-                                        child: Text(
+                                        child: const Text(
                                           'OK',
                                           style: TextStyle(
                                             color: Color(0xFF050404),
