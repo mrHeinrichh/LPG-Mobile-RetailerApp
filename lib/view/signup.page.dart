@@ -440,7 +440,7 @@ class _SignupPageState extends State<SignupPage> {
       "doe": "",
       "businessPermit": "",
       "fireSafetyPermit": "",
-      "agreement": "",
+      // "agreement": "",
     };
 
     try {
@@ -476,14 +476,14 @@ class _SignupPageState extends State<SignupPage> {
           userData["fireSafetyPermit"] = imageUrl3;
         }
       }
-      if (_image4 != null) {
-        final responseImage4 = await uploadImageToServer4(_image4!);
+      // if (_image4 != null) {
+      //   final responseImage4 = await uploadImageToServer4(_image4!);
 
-        if (responseImage4 != null) {
-          final imageUrl4 = responseImage4["data"][0]["path"];
-          userData["agreement"] = imageUrl4;
-        }
-      }
+      //   if (responseImage4 != null) {
+      //     final imageUrl4 = responseImage4["data"][0]["path"];
+      //     userData["agreement"] = imageUrl4;
+      //   }
+      // }
 
       final userResponse = await http.post(
         Uri.parse('https://lpg-api-06n8.onrender.com/api/v1/users'),
@@ -822,36 +822,36 @@ class _SignupPageState extends State<SignupPage> {
                             builder: (context, snapshot) {
                               return Column(
                                 children: [
-                                  Stack(
-                                    alignment: Alignment.topRight,
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 50,
-                                        backgroundImage: snapshot.data != null
-                                            ? FileImage(snapshot.data!)
-                                            : null,
-                                        backgroundColor: const Color(0xFF050404)
-                                            .withOpacity(0.9),
-                                        child: snapshot.data == null
-                                            ? const Icon(
-                                                Icons.person,
-                                                color: Colors.white,
-                                                size: 50,
-                                              )
-                                            : null,
-                                      ),
-                                    ],
-                                  ),
-                                  SignupImageUploadValidator(
-                                    takeImage: _takeImage4,
-                                    pickImage: _pickImage4,
-                                    buttonText: "Upload Agreement",
-                                    onImageSelected: (isSelected4) {
-                                      setState(() {
-                                        isImageSelected4 = isSelected4;
-                                      });
-                                    },
-                                  ),
+                                  // Stack(
+                                  //   alignment: Alignment.topRight,
+                                  //   children: [
+                                  //     CircleAvatar(
+                                  //       radius: 50,
+                                  //       backgroundImage: snapshot.data != null
+                                  //           ? FileImage(snapshot.data!)
+                                  //           : null,
+                                  //       backgroundColor: const Color(0xFF050404)
+                                  //           .withOpacity(0.9),
+                                  //       child: snapshot.data == null
+                                  //           ? const Icon(
+                                  //               Icons.person,
+                                  //               color: Colors.white,
+                                  //               size: 50,
+                                  //             )
+                                  //           : null,
+                                  //     ),
+                                  //   ],
+                                  // ),
+                                  // SignupImageUploadValidator(
+                                  //   takeImage: _takeImage4,
+                                  //   pickImage: _pickImage4,
+                                  //   buttonText: "Upload Agreement",
+                                  //   onImageSelected: (isSelected4) {
+                                  //     setState(() {
+                                  //       isImageSelected4 = isSelected4;
+                                  //     });
+                                  //   },
+                                  // ),
                                 ],
                               );
                             },

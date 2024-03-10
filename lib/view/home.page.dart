@@ -15,7 +15,7 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> {  
   List<Map<String, dynamic>> itemsData = [];
   List<Map<String, dynamic>> announcements = [];
   TextEditingController searchController = TextEditingController();
@@ -79,7 +79,7 @@ class _HomePageState extends State<HomePage> {
             'description': item['description'] ?? 'Description Not Available',
             'weight': (item['weight'] ?? 0).toString(),
             'stock': (item['stock'] ?? 0).toString(),
-            'availableStock': (item['stock'] ?? 0).toString(),
+            'availableStock': (item['stock'] ?? 0).toString(), 
           };
 
           if (groupedData.containsKey(category)) {

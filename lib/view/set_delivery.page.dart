@@ -194,7 +194,7 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
           "type": cartItem.itemType,
           "quantity": cartItem.stock,
           //
-          "totalPrice": cartItem.retailerPrice * cartItem.stock,
+          // "totalPrice": cartItem.retailerPrice * cartItem.stock,
         });
       }
     }
@@ -218,11 +218,13 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
         "houseLotBlk": houseNumberController.text,
         "paymentMethod": selectedPaymentMethod,
         "status": "Pending",
-        "assembly": selectedAssemblyOption.toString(),
+        // "assembly": selectedAssemblyOption.toString(),
         "deliveryDate": selectedDateTime.toString(),
         "barangay": selectedBarangay,
+        // "total": "",
         "to": userId,
         "feedback": "",
+        // "statuses": "",
         "rating": "0",
         "pickupImages": "",
         "completionImages": "",
@@ -231,13 +233,17 @@ class _SetDeliveryPageState extends State<SetDeliveryPage> {
         "pickedUp": "false",
         "cancelled": "false",
         "hasFeedback": "false",
+        // "long": "",
+        // "lat": "",
+        // "deleted": "false",
         "name": nameController.text,
         "contactNumber": contactNumberController.text,
         "items": itemsList,
+        "discounted": "false",
         "completed": "false",
-        "discountIdImage": "null",
-        "type": "Delivery",
-        "priceType": "retailer",
+        // "discountIdImage": "",
+        "__t": "Delivery",
+        "priceType": "Retailer",
       };
 
       final response = await http.post(
