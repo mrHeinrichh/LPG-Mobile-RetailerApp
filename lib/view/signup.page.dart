@@ -67,7 +67,7 @@ class _SignupPageState extends State<SignupPage> {
 
     if (pickedFile != null) {
       final imageFile = File(pickedFile.path);
-      _imageStreamController1.sink.add(imageFile);
+      _imageStreamController.sink.add(imageFile);
       setState(() {
         _image = File(pickedFile.path);
       });
