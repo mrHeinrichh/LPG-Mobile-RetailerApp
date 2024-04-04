@@ -3,8 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:retailer_app/view/my_orders.page.dart';
+// import 'package:customer_app/view/my_orders.page.dart';
 import 'package:http/http.dart' as http;
+import 'package:retailer_app/view/my_orders.page.dart';
 import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io' show Platform;
@@ -91,10 +92,13 @@ class _MapsPageState extends State<MapsPage> {
           zoom: zoom,
         ),
         children: [
-          TileLayer(
-            urlTemplate:
-                'https://maps.geoapify.com/v1/tile/klokantech-basic/{z}/{x}/{y}.png?apiKey=3e4c0fcabf244021845380f543236e29',
-          ),
+          isLoading
+              ? Center(child: CircularProgressIndicator())
+              : TileLayer(
+                  urlTemplate:
+                      'https://maps.geoapify.com/v1/tile/osm-bright-grey/{z}/{x}/{y}@2x.png?apiKey=YOUR_API_KEY',
+                  tileProvider: NetworkTileProvider(),
+                ),
           PolylineLayer(
             polylines: [
               Polyline(
@@ -151,14 +155,15 @@ class _MapsPageState extends State<MapsPage> {
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
         print(response.body);
 
-        final String riderId = data['data']['rider'];
+        final Map<String, dynamic> data = responseData['data'];
+        final String riderId = data['rider'];
+        final String deliveryLocation = data['deliveryLocation'];
+        final String startLatitude = data['lat'].toString();
+        final String startLongitude = data['long'].toString();
 
-        final String deliveryLocation = data['data']['deliveryLocation'];
-        final String startLatitude = data['data']['lat'];
-        final String startLongitude = data['data']['long'];
         print(
             'START LOCATION Latitude: $startLatitude, Longitude: $startLongitude');
 
